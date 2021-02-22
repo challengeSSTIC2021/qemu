@@ -27,9 +27,27 @@
 #include <time.h>
 //#include <stdint.h>
 
-const char DEBUG_KEY[] =  "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f";
-const char PROD_KEY[]  = "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f";
-const char WB_MASTER_KEY[] = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+//const char DEBUG_KEY[] =  "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f";
+//const char PROD_KEY[]  = "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f";
+//const char WB_MASTER_KEY[] = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+const char WB_MASTER_KEY[] = "\xdd\x2d\xbe\x18\x99\x1c\xd1\xc3\x82\x16\xc4\xc0\x53\xa1\xdf\x0b";
+#define NB_IDS 3
+
+const uint64_t debug_ids[NB_IDS] = {0x4307121376ebbe45, 0x0906271dff3e20b4, 0x7e0a6dea7841ef77};
+const uint64_t prod_ids[NB_IDS] = {0x9c92b27651376bfb, 0xd088c64e7d30e539, 0xa2faa696cc009d53};
+
+const char* debug_keys[NB_IDS] = {
+   "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f",
+   "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f",
+   "\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f"
+};
+
+const char* prod_keys[NB_IDS] = {
+   "\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f",
+   "\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f",
+   "\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf"
+};
+
 
 // sstic deb registers
 #define STDIN_PHY_ADDR 0
@@ -49,11 +67,13 @@ const char WB_MASTER_KEY[] = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x
 #define KEY2 0x38
 #define KEY3 0x3c
 #define EXEC 0x40
+#define KEYID_LO 0x44
+#define KEYID_HI 0x48
 
 #define OPCODE_WB_DEC 1
 #define OPCODE_EXEC_CODE 2
 
-#define DEBUG_SSTIC 1
+//#define DEBUG_SSTIC 1
 
 //not sure why I can't use stdint
 typedef unsigned char uint8_t;
@@ -100,7 +120,9 @@ typedef struct SSTICDevState {
     MemoryRegion mmio;
     MemoryRegion portio;
 
-    unsigned long debug_state;
+    unsigned int debug_state;
+    unsigned long keyid_lo;
+    unsigned long keyid_hi;
     struct sstic_command command;
 
 } SSTICDevState;
@@ -122,6 +144,7 @@ void command_decrypt_wb(struct sstic_command *command);
 int camelliaInit(CamelliaContext *context, const uint8_t *key, size_t keyLen);
 void camelliaDecryptBlock(CamelliaContext *context, const uint8_t *input, uint8_t *output);
 void execute_command(SSTICDevState *d);
+int find_idx(const unsigned long ids[], unsigned long req_id);
 
 #define TYPE_PCI_SSTIC_DEV "pci-sstic"
 
@@ -231,50 +254,78 @@ void command_decrypt_wb(struct sstic_command *command)
     }
     cpu_physical_memory_write(command->stdout.phys_addr, pay.buf, 16);
     command->retcode = 0;
-    
+}
 
+int find_idx(const unsigned long ids[], unsigned long req_id)
+{
+   int i;
+   for(i=0; i<NB_IDS; i++)
+   {
+      if(ids[i] == req_id)
+         return i;
+   }
+   return -1;
+}
 
 static uint64_t
 pci_sstic_read(void *opaque, hwaddr addr, unsigned size)
 {
-    SSTICDevState *d = opaque;
-    if(addr % 4)
-        return 0;
-    if(size != 4)
-        return 0;
-    const char *key = d->debug_state ? DEBUG_KEY : PROD_KEY;
-    switch(addr) {
-        case RETCODE:
-            return d->command.retcode;
-        case KEY0:
-            return *((uint32_t*)(key));
-        case KEY1:
-            return *((uint32_t*)(key + 4));
-        case KEY2:
-            return *((uint32_t*)(key + 0x8));
-        case KEY3:
-            return *((uint32_t*)(key + 0xc));
-    }
-    return 0;
+   SSTICDevState *d = opaque;
+   unsigned long id = (d->keyid_hi << 32) | d->keyid_lo;
+   const char *key;
+   int idx;
+   if(addr % 4)
+      return 0;
+   if(size != 4)
+      return 0;
+
+   switch(addr) {
+      case RETCODE:
+         return d->command.retcode;
+      case DEBUG_MODE:
+         return d->debug_state;
+   }
+
+   int want_prod_key = d->keyid_hi >> 31;
+   if(want_prod_key && d->debug_state)
+   {
+      return 0;
+   }
+   idx = find_idx(want_prod_key ? prod_ids : debug_ids, id);
+   if(idx == -1)
+      return 0;
+   key = want_prod_key ? prod_keys[idx] : debug_keys[idx];
+
+   switch(addr) {
+      case KEY0:
+         return *((uint32_t*)(key));
+      case KEY1:
+         return *((uint32_t*)(key + 4));
+      case KEY2:
+         return *((uint32_t*)(key + 0x8));
+      case KEY3:
+         return *((uint32_t*)(key + 0xc));
+   }
+   return 0;
 }
 
 void execute_command(SSTICDevState *d)
 {
-    #ifdef DEBUG_SSTIC
-    fprintf(stderr,"in command\n");
-    #endif
+   #ifdef DEBUG_SSTIC
+   fprintf(stderr,"in command\n");
+   #endif
 
-    switch(d->command.opcode)
-    {
-        case OPCODE_WB_DEC:
-            command_decrypt_wb(&d->command);
-            #ifdef DEBUG_SSTIC
-            fprintf(stderr,"retcode : %d\n",d->command.retcode);
-            #endif
-            break;
-        default:
-            d->command.retcode = -EINVAL;
-    }
+   switch(d->command.opcode)
+   {
+      case OPCODE_WB_DEC:
+         command_decrypt_wb(&d->command);
+         #ifdef DEBUG_SSTIC
+         fprintf(stderr,"retcode : %d\n",d->command.retcode);
+         #endif
+         break;
+      default:
+         d->command.retcode = -EINVAL;
+   }
 }
 
 static void
@@ -292,38 +343,44 @@ pci_sstic_mmio_write(void *opaque, hwaddr addr, uint64_t val,
         return;
 
     switch(addr) {
-        case DEBUG_MODE:
-            d->debug_state = val;
+         case DEBUG_MODE:
+               d->debug_state = val;
+               break;
+         case STDIN_PHY_ADDR:
+               d->command.stdin.phys_addr = val;
+               break;
+         case STDOUT_PHY_ADDR:
+               d->command.stdout.phys_addr = val;
+               break;      
+         case CODE_PHY_ADDR:
+               d->command.code.phys_addr = val;
+               break;
+         case STDERR_PHY_ADDR:
+               d->command.stderr.phys_addr = val;
+               break;
+         case STDIN_SIZE:
+               d->command.stdin.size = val;
             break;
-        case STDIN_PHY_ADDR:
-            d->command.stdin.phys_addr = val;
+         case STDOUT_SIZE:
+               d->command.stdout.size = val;
             break;
-        case STDOUT_PHY_ADDR:
-            d->command.stdout.phys_addr = val;
-            break;      
-        case CODE_PHY_ADDR:
-            d->command.code.phys_addr = val;
+         case STDERR_SIZE:
+               d->command.stderr.size = val;
             break;
-        case STDERR_PHY_ADDR:
-            d->command.stderr.phys_addr = val;
+         case CODE_SIZE:
+               d->command.code.size = val;
             break;
-        case STDIN_SIZE:
-            d->command.stdin.size = val;
-	        break;
-        case STDOUT_SIZE:
-            d->command.stdout.size = val;
-	        break;
-        case STDERR_SIZE:
-            d->command.stderr.size = val;
-	        break;
-        case CODE_SIZE:
-            d->command.code.size = val;
-	        break;
-        case OPCODE:
-            d->command.opcode = val;
+         case OPCODE:
+               d->command.opcode = val;
+               break;
+         case EXEC:
+               execute_command(d);
+               break;
+         case KEYID_LO:
+            d->keyid_lo = val;
             break;
-        case EXEC:
-            execute_command(d);
+         case KEYID_HI:
+            d->keyid_hi = val;
             break;
     }
 
