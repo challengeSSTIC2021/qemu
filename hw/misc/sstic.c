@@ -31,23 +31,23 @@
 //const char PROD_KEY[]  = "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f";
 //const char WB_MASTER_KEY[] = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
 const char WB_MASTER_KEY[] = "\xdd\x2d\xbe\x18\x99\x1c\xd1\xc3\x82\x16\xc4\xc0\x53\xa1\xdf\x0b";
-#define NB_IDS 3
 
-const uint64_t debug_ids[NB_IDS] = {0x4307121376ebbe45, 0x0906271dff3e20b4, 0x7e0a6dea7841ef77};
-const uint64_t prod_ids[NB_IDS] = {0x9c92b27651376bfb, 0xd088c64e7d30e539, 0xa2faa696cc009d53};
+const uint64_t debug_ids[] = {0x4307121376ebbe45, 0x0906271dff3e20b4, 0x7e0a6dea7841ef77, 0};
+const uint64_t prod_ids[] = {0x9c92b27651376bfb, 0xd088c64e7d30e539, 0xa2faa696cc009d53, 0};
 
-const char* debug_keys[NB_IDS] = {
+const char* debug_keys[] = {
    "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f",
    "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f",
-   "\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f"
+   "\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f",
+   NULL
 };
 
-const char* prod_keys[NB_IDS] = {
+const char* prod_keys[] = {
    "\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f",
    "\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f",
-   "\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf"
+   "\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf",
+   NULL
 };
-
 
 // sstic deb registers
 #define STDIN_PHY_ADDR 0
@@ -88,8 +88,8 @@ typedef unsigned int uint_t;
     uint8_t shift;
     uint8_t position;
  } CamelliaSubkey;
-  
-  
+
+
 
  typedef struct
  {
@@ -259,7 +259,7 @@ void command_decrypt_wb(struct sstic_command *command)
 int find_idx(const unsigned long ids[], unsigned long req_id)
 {
    int i;
-   for(i=0; i<NB_IDS; i++)
+   for(i=0; ids[i] != 0; i++)
    {
       if(ids[i] == req_id)
          return i;
@@ -335,7 +335,7 @@ pci_sstic_mmio_write(void *opaque, hwaddr addr, uint64_t val,
     #ifdef DEBUG_SSTIC
     fprintf(stderr,"in write addr: %lx, val = %lx size = %x\n",addr, val, size);
     #endif
-    
+
     SSTICDevState *d = opaque;
     if(addr % 4)
         return;
@@ -351,7 +351,7 @@ pci_sstic_mmio_write(void *opaque, hwaddr addr, uint64_t val,
                break;
          case STDOUT_PHY_ADDR:
                d->command.stdout.phys_addr = val;
-               break;      
+               break;
          case CODE_PHY_ADDR:
                d->command.code.phys_addr = val;
                break;
@@ -401,7 +401,7 @@ static void pci_sstic_realize(PCIDevice *pci_dev, Error **errp)
 {
     SSTICDevState *d = PCI_SSTIC_DEV(pci_dev);
     uint8_t *pci_conf;
-    
+
     pci_conf = pci_dev->config;
 
     pci_conf[PCI_INTERRUPT_PIN] = 0; /* no interrupt pin */
@@ -477,10 +477,10 @@ type_init(pci_sstic_register_types)
 //------------------------- camellia
 
 
- 
 
-#define ROL32(x,n) ( (x)<<(n) | ((x) & 0xffffffff) >> (32-(n)) ) 
-#define ROR32(x,n) ( (x)>>(n) | ((x) & 0xffffffff) << (32-(n)) ) 
+
+#define ROL32(x,n) ( (x)<<(n) | ((x) & 0xffffffff) >> (32-(n)) )
+#define ROR32(x,n) ( (x)>>(n) | ((x) & 0xffffffff) << (32-(n)) )
 
 
 
@@ -490,183 +490,183 @@ type_init(pci_sstic_register_types)
 #ifdef HTONS
     #undef HTONS
  #endif
-  
+
  #ifdef HTONL
     #undef HTONL
  #endif
-  
+
  #ifdef HTONLL
     #undef HTONLL
  #endif
-  
+
  #ifdef htons
     #undef htons
  #endif
-  
+
  #ifdef htonl
     #undef htonl
  #endif
-  
+
  #ifdef htonll
     #undef htonll
  #endif
-  
+
  #ifdef NTOHS
     #undef NTOHS
  #endif
-  
+
  #ifdef NTOHL
     #undef NTOHL
  #endif
-  
+
  #ifdef NTOHLL
     #undef NTOHLL
  #endif
-  
+
  #ifdef ntohs
     #undef ntohs
  #endif
-  
+
  #ifdef ntohl
     #undef ntohl
  #endif
-  
+
  #ifdef ntohll
     #undef ntohll
  #endif
-  
+
  #ifdef HTOLE16
     #undef HTOLE16
  #endif
-  
+
  #ifdef HTOLE32
     #undef HTOLE32
  #endif
-  
+
  #ifdef HTOLE64
     #undef HTOLE64
  #endif
-  
+
  #ifdef htole16
     #undef htole16
  #endif
-  
+
  #ifdef htole32
     #undef htole32
  #endif
-  
+
  #ifdef htole64
     #undef htole64
  #endif
-  
+
  #ifdef LETOH16
     #undef LETOH16
  #endif
-  
+
  #ifdef LETOH32
     #undef LETOH32
  #endif
-  
+
  #ifdef LETOH64
     #undef LETOH64
  #endif
-  
+
  #ifdef letoh16
     #undef letoh16
  #endif
-  
+
  #ifdef letoh32
     #undef letoh32
  #endif
-  
+
  #ifdef letoh64
     #undef letoh64
  #endif
-  
+
  #ifdef HTOBE16
     #undef HTOBE16
  #endif
-  
+
  #ifdef HTOBE32
     #undef HTOBE32
  #endif
-  
+
  #ifdef HTOBE64
     #undef HTOBE64
  #endif
-  
+
  #ifdef htobe16
     #undef htobe16
  #endif
-  
+
  #ifdef htobe32
     #undef htobe32
  #endif
-  
+
  #ifdef htobe64
     #undef htobe64
  #endif
-  
+
  #ifdef BETOH16
     #undef BETOH16
  #endif
-  
+
  #ifdef BETOH32
     #undef BETOH32
  #endif
-  
+
  #ifdef BETOH64
     #undef BETOH64
  #endif
-  
+
  #ifdef betoh16
     #undef betoh16
  #endif
-  
+
  #ifdef betoh32
     #undef betoh32
  #endif
-  
+
  #ifdef betoh64
     #undef betoh64
  #endif
-  
+
  //Load unaligned 16-bit integer (little-endian encoding)
  #define LOAD16LE(p) ( \
     ((uint16_t)(((uint8_t *)(p))[0]) << 0) | \
     ((uint16_t)(((uint8_t *)(p))[1]) << 8))
-  
+
  //Load unaligned 16-bit integer (big-endian encoding)
  #define LOAD16BE(p) ( \
     ((uint16_t)(((uint8_t *)(p))[0]) << 8) | \
     ((uint16_t)(((uint8_t *)(p))[1]) << 0))
-  
+
  //Load unaligned 24-bit integer (little-endian encoding)
  #define LOAD24LE(p) ( \
     ((uint32_t)(((uint8_t *)(p))[0]) << 0)| \
     ((uint32_t)(((uint8_t *)(p))[1]) << 8) | \
     ((uint32_t)(((uint8_t *)(p))[2]) << 16))
-  
+
  //Load unaligned 24-bit integer (big-endian encoding)
  #define LOAD24BE(p) ( \
     ((uint32_t)(((uint8_t *)(p))[0]) << 16) | \
     ((uint32_t)(((uint8_t *)(p))[1]) << 8) | \
     ((uint32_t)(((uint8_t *)(p))[2]) << 0))
-  
+
  //Load unaligned 32-bit integer (little-endian encoding)
  #define LOAD32LE(p) ( \
     ((uint32_t)(((uint8_t *)(p))[0]) << 0) | \
     ((uint32_t)(((uint8_t *)(p))[1]) << 8) | \
     ((uint32_t)(((uint8_t *)(p))[2]) << 16) | \
     ((uint32_t)(((uint8_t *)(p))[3]) << 24))
-  
+
  //Load unaligned 32-bit integer (big-endian encoding)
  #define LOAD32BE(p) ( \
     ((uint32_t)(((uint8_t *)(p))[0]) << 24) | \
     ((uint32_t)(((uint8_t *)(p))[1]) << 16) | \
     ((uint32_t)(((uint8_t *)(p))[2]) << 8) | \
     ((uint32_t)(((uint8_t *)(p))[3]) << 0))
-  
+
  //Load unaligned 48-bit integer (little-endian encoding)
  #define LOAD48LE(p) ( \
     ((uint64_t)(((uint8_t *)(p))[0]) << 0) | \
@@ -675,7 +675,7 @@ type_init(pci_sstic_register_types)
     ((uint64_t)(((uint8_t *)(p))[3]) << 24) | \
     ((uint64_t)(((uint8_t *)(p))[4]) << 32) | \
     ((uint64_t)(((uint8_t *)(p))[5]) << 40))
-  
+
  //Load unaligned 48-bit integer (big-endian encoding)
  #define LOAD48BE(p) ( \
     ((uint64_t)(((uint8_t *)(p))[0]) << 40) | \
@@ -684,7 +684,7 @@ type_init(pci_sstic_register_types)
     ((uint64_t)(((uint8_t *)(p))[3]) << 16) | \
     ((uint64_t)(((uint8_t *)(p))[4]) << 8) | \
     ((uint64_t)(((uint8_t *)(p))[5]) << 0))
-  
+
  //Load unaligned 64-bit integer (little-endian encoding)
  #define LOAD64LE(p) ( \
     ((uint64_t)(((uint8_t *)(p))[0]) << 0) | \
@@ -695,7 +695,7 @@ type_init(pci_sstic_register_types)
     ((uint64_t)(((uint8_t *)(p))[5]) << 40) | \
     ((uint64_t)(((uint8_t *)(p))[6]) << 48) | \
     ((uint64_t)(((uint8_t *)(p))[7]) << 56))
-  
+
  //Load unaligned 64-bit integer (big-endian encoding)
  #define LOAD64BE(p) ( \
     ((uint64_t)(((uint8_t *)(p))[0]) << 56) | \
@@ -706,43 +706,43 @@ type_init(pci_sstic_register_types)
     ((uint64_t)(((uint8_t *)(p))[5]) << 16) | \
     ((uint64_t)(((uint8_t *)(p))[6]) << 8) | \
     ((uint64_t)(((uint8_t *)(p))[7]) << 0))
-  
+
  //Store unaligned 16-bit integer (little-endian encoding)
  #define STORE16LE(a, p) \
     ((uint8_t *)(p))[0] = ((uint16_t)(a) >> 0) & 0xFFU, \
     ((uint8_t *)(p))[1] = ((uint16_t)(a) >> 8) & 0xFFU
-  
+
  //Store unaligned 32-bit integer (big-endian encoding)
  #define STORE16BE(a, p) \
     ((uint8_t *)(p))[0] = ((uint16_t)(a) >> 8) & 0xFFU, \
     ((uint8_t *)(p))[1] = ((uint16_t)(a) >> 0) & 0xFFU
-  
+
  //Store unaligned 24-bit integer (little-endian encoding)
  #define STORE24LE(a, p) \
     ((uint8_t *)(p))[0] = ((uint32_t)(a) >> 0) & 0xFFU, \
     ((uint8_t *)(p))[1] = ((uint32_t)(a) >> 8) & 0xFFU, \
     ((uint8_t *)(p))[2] = ((uint32_t)(a) >> 16) & 0xFFU
-  
+
  //Store unaligned 24-bit integer (big-endian encoding)
  #define STORE24BE(a, p) \
     ((uint8_t *)(p))[0] = ((uint32_t)(a) >> 16) & 0xFFU, \
     ((uint8_t *)(p))[1] = ((uint32_t)(a) >> 8) & 0xFFU, \
     ((uint8_t *)(p))[2] = ((uint32_t)(a) >> 0) & 0xFFU
-  
+
  //Store unaligned 32-bit integer (little-endian encoding)
  #define STORE32LE(a, p) \
     ((uint8_t *)(p))[0] = ((uint32_t)(a) >> 0) & 0xFFU, \
     ((uint8_t *)(p))[1] = ((uint32_t)(a) >> 8) & 0xFFU, \
     ((uint8_t *)(p))[2] = ((uint32_t)(a) >> 16) & 0xFFU, \
     ((uint8_t *)(p))[3] = ((uint32_t)(a) >> 24) & 0xFFU
-  
+
  //Store unaligned 32-bit integer (big-endian encoding)
  #define STORE32BE(a, p) \
     ((uint8_t *)(p))[0] = ((uint32_t)(a) >> 24) & 0xFFU, \
     ((uint8_t *)(p))[1] = ((uint32_t)(a) >> 16) & 0xFFU, \
     ((uint8_t *)(p))[2] = ((uint32_t)(a) >> 8) & 0xFFU, \
     ((uint8_t *)(p))[3] = ((uint32_t)(a) >> 0) & 0xFFU
-  
+
  //Store unaligned 48-bit integer (little-endian encoding)
  #define STORE48LE(a, p) \
     ((uint8_t *)(p))[0] = ((uint64_t)(a) >> 0) & 0xFFU, \
@@ -751,7 +751,7 @@ type_init(pci_sstic_register_types)
     ((uint8_t *)(p))[3] = ((uint64_t)(a) >> 24) & 0xFFU, \
     ((uint8_t *)(p))[4] = ((uint64_t)(a) >> 32) & 0xFFU, \
     ((uint8_t *)(p))[5] = ((uint64_t)(a) >> 40) & 0xFFU,
-  
+
  //Store unaligned 48-bit integer (big-endian encoding)
  #define STORE48BE(a, p) \
     ((uint8_t *)(p))[0] = ((uint64_t)(a) >> 40) & 0xFFU, \
@@ -760,7 +760,7 @@ type_init(pci_sstic_register_types)
     ((uint8_t *)(p))[3] = ((uint64_t)(a) >> 16) & 0xFFU, \
     ((uint8_t *)(p))[4] = ((uint64_t)(a) >> 8) & 0xFFU, \
     ((uint8_t *)(p))[5] = ((uint64_t)(a) >> 0) & 0xFFU
-  
+
  //Store unaligned 64-bit integer (little-endian encoding)
  #define STORE64LE(a, p) \
     ((uint8_t *)(p))[0] = ((uint64_t)(a) >> 0) & 0xFFU, \
@@ -771,7 +771,7 @@ type_init(pci_sstic_register_types)
     ((uint8_t *)(p))[5] = ((uint64_t)(a) >> 40) & 0xFFU, \
     ((uint8_t *)(p))[6] = ((uint64_t)(a) >> 48) & 0xFFU, \
     ((uint8_t *)(p))[7] = ((uint64_t)(a) >> 56) & 0xFFU
-  
+
  //Store unaligned 64-bit integer (big-endian encoding)
  #define STORE64BE(a, p) \
     ((uint8_t *)(p))[0] = ((uint64_t)(a) >> 56) & 0xFFU, \
@@ -782,19 +782,19 @@ type_init(pci_sstic_register_types)
     ((uint8_t *)(p))[5] = ((uint64_t)(a) >> 16) & 0xFFU, \
     ((uint8_t *)(p))[6] = ((uint64_t)(a) >> 8) & 0xFFU, \
     ((uint8_t *)(p))[7] = ((uint64_t)(a) >> 0) & 0xFFU
-  
+
  //Swap a 16-bit integer
  #define SWAPINT16(x) ( \
     (((uint16_t)(x) & 0x00FFU) << 8) | \
     (((uint16_t)(x) & 0xFF00U) >> 8))
-  
+
  //Swap a 32-bit integer
  #define SWAPINT32(x) ( \
     (((uint32_t)(x) & 0x000000FFUL) << 24) | \
     (((uint32_t)(x) & 0x0000FF00UL) << 8) | \
     (((uint32_t)(x) & 0x00FF0000UL) >> 8) | \
     (((uint32_t)(x) & 0xFF000000UL) >> 24))
-  
+
  //Swap a 64-bit integer
  #define SWAPINT64(x) ( \
     (((uint64_t)(x) & 0x00000000000000FFULL) << 56) | \
@@ -805,12 +805,12 @@ type_init(pci_sstic_register_types)
     (((uint64_t)(x) & 0x0000FF0000000000ULL) >> 24) | \
     (((uint64_t)(x) & 0x00FF000000000000ULL) >> 40) | \
     (((uint64_t)(x) & 0xFF00000000000000ULL) >> 56))
-  
- 
-  
+
+
+
  //Little-endian machine?
 
-  
+
  //Host byte order to network byte order
  #define HTONS(value) SWAPINT16(value)
  #define HTONL(value) SWAPINT32(value)
@@ -818,7 +818,7 @@ type_init(pci_sstic_register_types)
  #define htons(value) swapInt16((uint16_t) (value))
  #define htonl(value) swapInt32((uint32_t) (value))
  #define htonll(value) swapInt64((uint64_t) (value))
-  
+
  //Network byte order to host byte order
  #define NTOHS(value) SWAPINT16(value)
  #define NTOHL(value) SWAPINT32(value)
@@ -826,7 +826,7 @@ type_init(pci_sstic_register_types)
  #define ntohs(value) swapInt16((uint16_t) (value))
  #define ntohl(value) swapInt32((uint32_t) (value))
  #define ntohll(value) swapInt64((uint64_t) (value))
-  
+
  //Host byte order to little-endian byte order
  #define HTOLE16(value) (value)
  #define HTOLE32(value) (value)
@@ -834,7 +834,7 @@ type_init(pci_sstic_register_types)
  #define htole16(value) ((uint16_t) (value))
  #define htole32(value) ((uint32_t) (value))
  #define htole64(value) ((uint64_t) (value))
-  
+
  //Little-endian byte order to host byte order
  #define LETOH16(value) (value)
  #define LETOH32(value) (value)
@@ -842,23 +842,23 @@ type_init(pci_sstic_register_types)
  #define letoh16(value) ((uint16_t) (value))
  #define letoh32(value) ((uint32_t) (value))
  #define letoh64(value) ((uint64_t) (value))
-  
+
  //Host byte order to big-endian byte order
  #define HTOBE16(value) SWAPINT16(value)
  #define HTOBE32(value) SWAPINT32(value)
  #define HTOBE64(value) SWAPINT64(value)
 
-  
+
  //Big-endian byte order to host byte order
  #define BETOH16(value) SWAPINT16(value)
  #define BETOH32(value) SWAPINT32(value)
  #define BETOH64(value) SWAPINT64(value)
 
- 
-  
 
-  
-  
+
+
+
+
  //Camellia round function
  #define CAMELLIA_ROUND(left1, left2, right1, right2, k1, k2) \
  { \
@@ -873,7 +873,7 @@ type_init(pci_sstic_register_types)
     left1 = temp2; \
     left2 = temp1; \
  }
-  
+
  //F-function
  #define CAMELLIA_F(xl, xr, kl, kr) \
  { \
@@ -882,7 +882,7 @@ type_init(pci_sstic_register_types)
     CAMELLIA_S(xl, xr); \
     CAMELLIA_P(xl, xr); \
  }
-  
+
  //FL-function
  #define CAMELLIA_FL(xl, xr, kl, kr) \
  { \
@@ -890,7 +890,7 @@ type_init(pci_sstic_register_types)
     xr ^= ROL32(temp1, 1); \
     xl ^= (xr | kr); \
  }
-  
+
  //Inverse FL-function
  #define CAMELLIA_INV_FL(yl, yr, kl, kr) \
  { \
@@ -898,7 +898,7 @@ type_init(pci_sstic_register_types)
     temp1 = (yl & kl); \
     yr ^= ROL32(temp1, 1); \
  }
-  
+
  //S-function
  #define CAMELLIA_S(zl, zr) \
  { \
@@ -907,7 +907,7 @@ type_init(pci_sstic_register_types)
     zr = (sbox2[(zr >> 24) & 0xFF] << 24) | (sbox3[(zr >> 16) & 0xFF] << 16) | \
        (sbox4[(zr >> 8) & 0xFF] << 8) | sbox1[zr & 0xFF]; \
  }
-  
+
  //P-function
  #define CAMELLIA_P(zl, zr) \
  { \
@@ -916,7 +916,7 @@ type_init(pci_sstic_register_types)
     zl ^= ROR32(zr, 8); \
     zr ^= ROR32(zl, 8); \
  }
-  
+
  //Key schedule related constants
  #define KL 0
  #define KR 4
@@ -924,7 +924,7 @@ type_init(pci_sstic_register_types)
  #define KB 12
  #define L  0
  #define R  64
-  
+
  //Key schedule for 128-bit key
  static const CamelliaSubkey ks1[] =
  {
@@ -955,7 +955,7 @@ type_init(pci_sstic_register_types)
     {48, KA, 111, L}, //kw3
     {50, KA, 111, R}, //kw4
  };
-  
+
  //Key schedule for 192 and 256-bit keys
  static const CamelliaSubkey ks2[] =
  {
@@ -994,7 +994,7 @@ type_init(pci_sstic_register_types)
     {64, KB, 111, L}, //kw3
     {66, KB, 111, R}, //kw4
  };
-  
+
  //Key schedule constants
  static const uint32_t sigma[12] =
  {
@@ -1005,7 +1005,7 @@ type_init(pci_sstic_register_types)
     0x10E527FA, 0xDE682D1D,
     0xB05688C2, 0xB3E6C1FD
  };
-  
+
  //Substitution table 1
  static const uint8_t sbox1[256] =
  {
@@ -1026,7 +1026,7 @@ type_init(pci_sstic_register_types)
     0x72, 0x07, 0xB9, 0x55, 0xF8, 0xEE, 0xAC, 0x0A, 0x36, 0x49, 0x2A, 0x68, 0x3C, 0x38, 0xF1, 0xA4,
     0x40, 0x28, 0xD3, 0x7B, 0xBB, 0xC9, 0x43, 0xC1, 0x15, 0xE3, 0xAD, 0xF4, 0x77, 0xC7, 0x80, 0x9E
  };
-  
+
  //Substitution table 2
  static const uint8_t sbox2[256] =
  {
@@ -1047,7 +1047,7 @@ type_init(pci_sstic_register_types)
     0xE4, 0x0E, 0x73, 0xAA, 0xF1, 0xDD, 0x59, 0x14, 0x6C, 0x92, 0x54, 0xD0, 0x78, 0x70, 0xE3, 0x49,
     0x80, 0x50, 0xA7, 0xF6, 0x77, 0x93, 0x86, 0x83, 0x2A, 0xC7, 0x5B, 0xE9, 0xEE, 0x8F, 0x01, 0x3D
  };
-  
+
  //Substitution table 3
  static const uint8_t sbox3[256] =
  {
@@ -1068,7 +1068,7 @@ type_init(pci_sstic_register_types)
     0x39, 0x83, 0xDC, 0xAA, 0x7C, 0x77, 0x56, 0x05, 0x1B, 0xA4, 0x15, 0x34, 0x1E, 0x1C, 0xF8, 0x52,
     0x20, 0x14, 0xE9, 0xBD, 0xDD, 0xE4, 0xA1, 0xE0, 0x8A, 0xF1, 0xD6, 0x7A, 0xBB, 0xE3, 0x40, 0x4F
  };
-  
+
  //Substitution table 4
  static const uint8_t sbox4[256] =
  {
@@ -1089,9 +1089,9 @@ type_init(pci_sstic_register_types)
     0x79, 0x8C, 0x6E, 0x8E, 0xF5, 0xB6, 0xFD, 0x59, 0x98, 0x6A, 0x46, 0xBA, 0x25, 0x42, 0xA2, 0xFA,
     0x07, 0x55, 0xEE, 0x0A, 0x49, 0x68, 0x38, 0xA4, 0x28, 0x7B, 0xC9, 0xC1, 0xE3, 0xF4, 0xC7, 0x9E
  };
-  
 
-  
+
+
  int camelliaInit(CamelliaContext *context, const uint8_t *key, size_t keyLen)
  {
     uint_t i;
@@ -1099,11 +1099,11 @@ type_init(pci_sstic_register_types)
     uint32_t temp2;
     uint32_t *k;
     const CamelliaSubkey *p;
-  
+
     //Check parameters
     if(context == NULL || key == NULL)
        return -EINVAL;
-  
+
     //Check the length of the key
     if(keyLen == 16)
     {
@@ -1120,14 +1120,14 @@ type_init(pci_sstic_register_types)
        //Report an error
        return -EINVAL;
     }
-  
+
     //Point to KA, KB, KL and KR
     k = context->k;
     //Clear key contents
     memset(k, 0, 64);
     //Save the supplied secret key
     memcpy(k, key, keyLen);
-  
+
     //192-bit keys require special processing
     if(keyLen == 24)
     {
@@ -1135,7 +1135,7 @@ type_init(pci_sstic_register_types)
        k[KR + 2] = ~k[KR + 0];
        k[KR + 3] = ~k[KR + 1];
     }
-  
+
     //XOR KL and KR before applying the rounds
     for(i = 0; i < 4; i++)
     {
@@ -1143,13 +1143,13 @@ type_init(pci_sstic_register_types)
        k[KR + i] = BETOH32(k[KR + i]);
        k[KB + i] = k[KL + i] ^ k[KR + i];
     }
-  
+
     //Generate the 128-bit keys KA and KB
     for(i = 0; i < 6; i++)
     {
        //Apply round function
        CAMELLIA_ROUND(k[KB + 0], k[KB + 1], k[KB + 2], k[KB + 3], sigma[2 * i], sigma[2 * i + 1]);
-  
+
        //The 2nd round requires special processing
        if(i == 1)
        {
@@ -1171,7 +1171,7 @@ type_init(pci_sstic_register_types)
           k[KB + 3] ^= k[KR + 3];
        }
     }
-  
+
     //The key schedule depends on the length of key
     if(keyLen == 16)
     {
@@ -1185,7 +1185,7 @@ type_init(pci_sstic_register_types)
        i = arraysize(ks2);
        p = ks2;
     }
-  
+
     //Generate subkeys
     while(i > 0)
     {
@@ -1194,7 +1194,7 @@ type_init(pci_sstic_register_types)
        uint_t m = (p->shift + p->position) % 32;
        //Point to KL, KR, KA or KB
        k = context->k + p->key;
-  
+
        //Generate the current subkey
        if(m == 0)
        {
@@ -1206,43 +1206,43 @@ type_init(pci_sstic_register_types)
           context->ks[p->index] = (k[n % 4] << m) | (k[(n + 1) % 4] >> (32 - m));
           context->ks[p->index + 1] = (k[(n + 1) % 4] << m) | (k[(n + 2) % 4] >> (32 - m));
        }
-  
+
        //Next subkey
        p++;
        i--;
     }
-  
+
     //No error to report
     return 0;
  }
-  
-  
 
-  
- 
-  
+
+
+
+
+
  void camelliaDecryptBlock(CamelliaContext *context, const uint8_t *input, uint8_t *output)
  {
     uint_t i;
     uint32_t temp1;
     uint32_t temp2;
     uint32_t *ks;
-  
+
     //The ciphertext is separated into two parts (L and R)
     uint32_t right1 = LOAD32BE(input + 0);
     uint32_t right2 = LOAD32BE(input + 4);
     uint32_t left1 = LOAD32BE(input + 8);
     uint32_t left2 = LOAD32BE(input + 12);
-  
+
     //The key schedule must be applied in reverse order
     ks = (context->nr == 18) ? (context->ks + 48) : (context->ks + 64);
-  
+
     //XOR ciphertext with kw3 and kw4
     right1 ^= ks[0];
     right2 ^= ks[1];
     left1 ^= ks[2];
     left2 ^= ks[3];
-  
+
     //Apply round function 18 or 24 times depending on the key length
     for(i = context->nr; i > 0; i--)
     {
@@ -1250,7 +1250,7 @@ type_init(pci_sstic_register_types)
        ks -= 2;
        //Apply round function
        CAMELLIA_ROUND(right1, right2, left1, left2, ks[0], ks[1]);
-  
+
        //6th, 12th and 18th rounds require special processing
        if(i == 7 || i == 13 || i == 19)
        {
@@ -1262,7 +1262,7 @@ type_init(pci_sstic_register_types)
           CAMELLIA_INV_FL(left1, left2, ks[0], ks[1])
        }
     }
-  
+
     //Update current location in key schedule
     ks -= 4;
     //XOR operation with kw1 and kw2
@@ -1270,11 +1270,11 @@ type_init(pci_sstic_register_types)
     left2 ^= ks[1];
     right1 ^= ks[2];
     right2 ^= ks[3];
-  
+
     //The resulting value is the plaintext
     STORE32BE(left1, output + 0);
     STORE32BE(left2, output + 4);
     STORE32BE(right1, output + 8);
     STORE32BE(right2, output + 12);
  }
-  
+
