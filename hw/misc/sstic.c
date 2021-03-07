@@ -137,7 +137,7 @@ struct dec_payload
     unsigned long id;
 };
 
-//compiler want prototypes
+//compiler wants prototypes
 int wb_generate_key(unsigned long id, uint8_t key[16]);
 int wb_decrypt(uint8_t ct[16], uint8_t key[16]);
 void command_decrypt_wb(struct sstic_command *command);
@@ -145,6 +145,7 @@ int camelliaInit(CamelliaContext *context, const uint8_t *key, size_t keyLen);
 void camelliaDecryptBlock(CamelliaContext *context, const uint8_t *input, uint8_t *output);
 void execute_command(SSTICDevState *d);
 int find_idx(const unsigned long ids[], unsigned long req_id);
+void command_execute_code(struct sstic_command *command);
 
 #define TYPE_PCI_SSTIC_DEV "pci-sstic"
 
@@ -256,6 +257,154 @@ void command_decrypt_wb(struct sstic_command *command)
     command->retcode = 0;
 }
 
+void command_execute_code(struct sstic_command *command)
+{
+   char *memory = NULL;
+   char filename [L_tmpnam] = {0};
+   char pathname [1100] = {0};
+   char comm [2000] = {0};
+   char buf_stderr[1000] = {0};
+   const char rom[0x40] = { 0x24, 0x92, 0x98, 0x45, 0x33, 0xe3, 0xf6, 0xe7, 0x72, 0xb, 0xda, 0xef, 0x39, 0x3e, 0x4, 0x96, 0xe8, 0x4f, 0xc7, 0x26, 0x45, 0x3e, 0x19, 0x5, 0x15, 0x2e, 0xbd, 0x8c, 0xf3, 0xdc, 0xca, 0x45, 0xbf, 0xff, 0xea, 0x53, 0xef, 0xf6, 0xef, 0x35, 0xcf, 0x5b, 0x63, 0xf1, 0xf4, 0x3c, 0x57, 0x4e, 0x19, 0xae, 0x78, 0xf, 0x2c, 0x15, 0x89, 0x9d, 0x14, 0x72, 0xf4, 0x2e, 0x72, 0x34, 0x4, 0xd2};
+   char *ret;
+   int rret;
+   int memfile;
+   size_t n, stderr_size_read = 0;
+   FILE * output;
+   //init memory
+   //ROM 0 - 0x1000
+   //code 0x1000 - 0x2000
+   //stdin 0x2000 - 0x3000
+   //stdout 0x3000 - 0x4000
+   //data 0x4000 - 0x10000
+
+   //ROM
+
+   if (command->stdin.size != 0x1000 || !command->stdin.phys_addr)
+   {
+      #ifdef DEBUG_SSTIC
+      fprintf(stderr,"stdin addr %x size: %x\n", command->stdin.size, command->stdin.phys_addr);
+      #endif
+      command->retcode = -EINVAL;
+      goto out;
+   }
+   if (command->stdin.size != 0x1000 || !command->stdout.phys_addr)
+   {
+      #ifdef DEBUG_SSTIC
+      fprintf(stderr,"stdout addr %x size: %x\n", command->stdout.size, command->stdout.phys_addr);
+      #endif
+      command->retcode = -EINVAL;
+      goto out;
+   }
+   if (command->stderr.size != 0x1000 || !command->stderr.phys_addr)
+   {
+      #ifdef DEBUG_SSTIC
+      fprintf(stderr,"stderr addr %x size: %x\n", command->stdout.size, command->stdout.phys_addr);
+      #endif
+      command->retcode = -EINVAL;
+      goto out;
+   }
+   if (command->code.size != 0x1000 || !command->code.phys_addr)
+   {
+      #ifdef DEBUG_SSTIC
+      fprintf(stderr,"stderr addr %x size: %x\n", command->stdout.size, command->stdout.phys_addr);
+      #endif
+      command->retcode = -EINVAL;
+      goto out;
+   }
+
+   memory = malloc(0x10000);
+   if (!memory)
+   {
+      command->retcode = -ENOMEM;
+      goto out;
+   }
+   //todo ROM
+   memcpy(memory + 0x100, rom, 0x40);
+   cpu_physical_memory_read(command->stdin.phys_addr, memory + 0x2000, 0x1000);
+   cpu_physical_memory_read(command->code.phys_addr, memory + 0x1000, 0x1000);
+   ret = tmpnam(filename);
+   if(!filename[0])
+   {
+      command->retcode = -ENOMEM;
+      goto out_free;
+   }
+   sprintf(pathname,"/tmp/%s", filename);
+   memfile = open(pathname, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+   if(memfile == -1)
+   {
+      command->retcode = -EBADF;
+      goto out_free;
+   } 
+
+   n = write(memfile, memory, 0x10000);
+   if(n != 0x10000)
+   {
+      command->retcode = -EINVAL;
+      goto out_memfile;
+   }
+   close(memfile);
+
+   //execute code emulator
+   snprintf(comm, 2000, "/usr/bin/python3 /root/asm.py %s", pathname);
+
+   output = popen(comm, "r");
+   if(!output)
+   {
+      command->retcode = -ENOMEM;
+      goto out_free;
+   }
+
+   while(!feof(output))
+   {
+      ret = fgets(buf_stderr, 1000, output);
+      if(!ret)
+      {
+         command->retcode = -ENOBUFS;
+         pclose(output);
+         goto out_free;
+      }
+      n = strlen(buf_stderr);
+      if (n + stderr_size_read >= 0x1000)
+         n = 0x1000 - stderr_size_read - 1;
+      if (!n || n > 0x1000)
+         break;
+      cpu_physical_memory_write(command->stderr.phys_addr + stderr_size_read, buf_stderr, n);
+      stderr_size_read += n;
+   }
+   
+
+   //read stdout
+   memfile = open(pathname, O_RDONLY);
+   if(memfile == -1)
+   {
+      command->retcode = -EBADF;
+      goto out_free;
+   } 
+   rret = lseek(memfile, 0x3000, SEEK_SET);
+   if(rret == -1)
+   {
+      command->retcode = -EBUSY;
+      goto out_memfile;
+   }
+   n = read(memfile, memory, 0x10000);
+   if(n != 0x10000)
+   {
+      command->retcode = -EBADF;
+      goto out_memfile;
+   }
+
+   cpu_physical_memory_write(command->stdout.phys_addr, memory + 0x3000, 0x1000);
+
+   out_memfile:
+   close(memfile);
+   remove(pathname);
+   out_free:
+   free(memory);
+   out:
+   return;
+}
+
+
 int find_idx(const unsigned long ids[], unsigned long req_id)
 {
    int i;
@@ -319,6 +468,12 @@ void execute_command(SSTICDevState *d)
    {
       case OPCODE_WB_DEC:
          command_decrypt_wb(&d->command);
+         #ifdef DEBUG_SSTIC
+         fprintf(stderr,"retcode : %d\n",d->command.retcode);
+         #endif
+         break;
+      case OPCODE_EXEC_CODE:
+         command_execute_code(&d->command);
          #ifdef DEBUG_SSTIC
          fprintf(stderr,"retcode : %d\n",d->command.retcode);
          #endif
