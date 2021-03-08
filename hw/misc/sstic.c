@@ -25,6 +25,7 @@
 #include "crypto/hash.h"
 #include "qemu-common.h"
 #include <time.h>
+#include <errno.h>
 //#include <stdint.h>
 
 //const char DEBUG_KEY[] =  "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f";
@@ -261,10 +262,10 @@ void command_execute_code(struct sstic_command *command)
 {
    char *memory = NULL;
    char filename [L_tmpnam] = {0};
-   char pathname [1100] = {0};
+   //char pathname [1100] = {0};
    char comm [2000] = {0};
    char buf_stderr[1000] = {0};
-   const char rom[0x40] = { 0x24, 0x92, 0x98, 0x45, 0x33, 0xe3, 0xf6, 0xe7, 0x72, 0xb, 0xda, 0xef, 0x39, 0x3e, 0x4, 0x96, 0xe8, 0x4f, 0xc7, 0x26, 0x45, 0x3e, 0x19, 0x5, 0x15, 0x2e, 0xbd, 0x8c, 0xf3, 0xdc, 0xca, 0x45, 0xbf, 0xff, 0xea, 0x53, 0xef, 0xf6, 0xef, 0x35, 0xcf, 0x5b, 0x63, 0xf1, 0xf4, 0x3c, 0x57, 0x4e, 0x19, 0xae, 0x78, 0xf, 0x2c, 0x15, 0x89, 0x9d, 0x14, 0x72, 0xf4, 0x2e, 0x72, 0x34, 0x4, 0xd2};
+   const char rom[0x40] = { 0x24, 0x72, 0x98, 0x45, 0x33, 0xe3, 0xf6, 0xe7, 0x72, 0xb, 0xda, 0xef, 0x39, 0x3e, 0x4, 0x96, 0xd8, 0x2f, 0xc7, 0x26, 0x45, 0x3e, 0x19, 0x5, 0x15, 0x2e, 0xbd, 0x8c, 0xf3, 0xdc, 0xca, 0x45, 0x9f, 0xdf, 0xea, 0x53, 0xef, 0xf6, 0xef, 0x35, 0xcf, 0x5b, 0x63, 0xf1, 0xf4, 0x3c, 0x57, 0x4e, 0xc9, 0x4e, 0x7b, 0xf, 0x2c, 0x15, 0x89, 0x9d, 0x14, 0x72, 0xf4, 0x2e, 0x72, 0x34, 0x4, 0xd2 };
    char *ret;
    int rret;
    int memfile;
@@ -282,12 +283,12 @@ void command_execute_code(struct sstic_command *command)
    if (command->stdin.size != 0x1000 || !command->stdin.phys_addr)
    {
       #ifdef DEBUG_SSTIC
-      fprintf(stderr,"stdin addr %x size: %x\n", command->stdin.size, command->stdin.phys_addr);
+      fprintf(stdin,"stdin addr %x size: %x\n", command->stdin.size, command->stdin.phys_addr);
       #endif
       command->retcode = -EINVAL;
       goto out;
    }
-   if (command->stdin.size != 0x1000 || !command->stdout.phys_addr)
+   if (command->stdout.size != 0x1000 || !command->stdout.phys_addr)
    {
       #ifdef DEBUG_SSTIC
       fprintf(stderr,"stdout addr %x size: %x\n", command->stdout.size, command->stdout.phys_addr);
@@ -298,7 +299,7 @@ void command_execute_code(struct sstic_command *command)
    if (command->stderr.size != 0x1000 || !command->stderr.phys_addr)
    {
       #ifdef DEBUG_SSTIC
-      fprintf(stderr,"stderr addr %x size: %x\n", command->stdout.size, command->stdout.phys_addr);
+      fprintf(stderr,"stderr addr %x size: %x\n", command->stderr.size, command->stderr.phys_addr);
       #endif
       command->retcode = -EINVAL;
       goto out;
@@ -306,7 +307,7 @@ void command_execute_code(struct sstic_command *command)
    if (command->code.size != 0x1000 || !command->code.phys_addr)
    {
       #ifdef DEBUG_SSTIC
-      fprintf(stderr,"stderr addr %x size: %x\n", command->stdout.size, command->stdout.phys_addr);
+      fprintf(stderr,"code addr %x size: %x\n", command->code.size, command->code.phys_addr);
       #endif
       command->retcode = -EINVAL;
       goto out;
@@ -328,12 +329,19 @@ void command_execute_code(struct sstic_command *command)
       command->retcode = -ENOMEM;
       goto out_free;
    }
-   sprintf(pathname,"/tmp/%s", filename);
-   memfile = open(pathname, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+   //sprintf(pathname,"/tmp/%s", filename);
+#ifdef DEBUG_SSTIC
+   fprintf(stderr,"pathname : %s\n", filename);
+#endif
+
+   memfile = open(filename, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
    if(memfile == -1)
    {
-      command->retcode = -EBADF;
-      goto out_free;
+#ifdef DEBUG_SSTIC
+	   fprintf(stderr,"impossible to create file : %d\n",errno);
+#endif
+	   command->retcode = -EBADF;
+	   goto out_free;
    } 
 
    n = write(memfile, memory, 0x10000);
@@ -343,9 +351,13 @@ void command_execute_code(struct sstic_command *command)
       goto out_memfile;
    }
    close(memfile);
+#ifdef DEBUG_SSTIC
+   fprintf(stderr,"memory");
+   qemu_hexdump(stderr, "stderr", memory , 0x3000);
+#endif
 
    //execute code emulator
-   snprintf(comm, 2000, "/usr/bin/python3 /root/asm.py %s", pathname);
+   snprintf(comm, 2000, "/usr/bin/python3 /root/asm.py %s", filename);
 
    output = popen(comm, "r");
    if(!output)
@@ -359,9 +371,12 @@ void command_execute_code(struct sstic_command *command)
       ret = fgets(buf_stderr, 1000, output);
       if(!ret)
       {
+	 //nothing to read
+	 continue;
+	 /*
          command->retcode = -ENOBUFS;
          pclose(output);
-         goto out_free;
+         goto out_free;*/
       }
       n = strlen(buf_stderr);
       if (n + stderr_size_read >= 0x1000)
@@ -369,14 +384,22 @@ void command_execute_code(struct sstic_command *command)
       if (!n || n > 0x1000)
          break;
       cpu_physical_memory_write(command->stderr.phys_addr + stderr_size_read, buf_stderr, n);
+#ifdef DEBUG_SSTIC
+      qemu_hexdump(stderr, "stdout", buf_stderr , 0x40);
+#endif
+
       stderr_size_read += n;
    }
    
 
    //read stdout
-   memfile = open(pathname, O_RDONLY);
+   memfile = open(filename, O_RDONLY);
    if(memfile == -1)
    {
+#ifdef DEBUG_SSTIC
+      fprintf(stderr,"impossible to open file R : %d\n",errno);
+#endif
+
       command->retcode = -EBADF;
       goto out_free;
    } 
@@ -386,18 +409,26 @@ void command_execute_code(struct sstic_command *command)
       command->retcode = -EBUSY;
       goto out_memfile;
    }
-   n = read(memfile, memory, 0x10000);
-   if(n != 0x10000)
+   n = read(memfile, memory + 0x3000, 0x1000);
+   if(n != 0x1000)
    {
+#ifdef DEBUG_SSTIC
+	   fprintf(stderr,"read less than 0x10000: %lx errno : %d\n",n,errno);
+#endif
+
       command->retcode = -EBADF;
       goto out_memfile;
    }
+#ifdef DEBUG_SSTIC
+qemu_hexdump(stderr, "stdout", memory+0x3000 , 0x40);
+#endif
+
 
    cpu_physical_memory_write(command->stdout.phys_addr, memory + 0x3000, 0x1000);
 
    out_memfile:
    close(memfile);
-   remove(pathname);
+   remove(filename);
    out_free:
    free(memory);
    out:
