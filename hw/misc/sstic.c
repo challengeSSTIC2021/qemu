@@ -392,7 +392,7 @@ void command_execute_code(struct sstic_command *command)
 
       stderr_size_read += n;
    }
-   
+   pclose(output);
 
    //read stdout
    memfile = open(filename, O_RDONLY);
