@@ -26,6 +26,7 @@
 #include "qemu-common.h"
 #include <time.h>
 #include <errno.h>
+#include <string.h>
 //#include <stdint.h>
 
 //const char DEBUG_KEY[] =  "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f";
@@ -319,6 +320,7 @@ void command_execute_code(struct sstic_command *command)
       command->retcode = -ENOMEM;
       goto out;
    }
+   memset(memory,0,0x10000);
    //todo ROM
    memcpy(memory + 0x100, rom, 0x40);
    cpu_physical_memory_read(command->stdin.phys_addr, memory + 0x2000, 0x1000);
